@@ -1,0 +1,429 @@
+---
+title: "HW5-Fitting Models"
+subtitle: "Jie Chen 07/14/2024"
+format: html
+editor: visual
+---
+
+The purpose of this homework is to get practice fitting models using the caret package.
+
+## Task 1: Conceptual Questions
+
+1.  What is the purpose of using cross-validation when fitting a random forest model?
+
+    Cross-validation is essential when fitting a random forest model because it provides a robust way to evaluate the model’s performance, prevents overfitting, helps in hyperparameter tuning, and ensures the model’s reliability and generalizability.
+
+2.  Describe the bagged tree algorithm.
+
+    Generate new training samples (bootstrap sampling) with replacement. Training individual tree and aggregate pridictions. It reduces overfitting, improves accuracy, and provides robustness against noise and outliers, making it a powerful ensemble technique in machine learning.
+    
+3. What is meant by a general linear model?
+
+    A General Linear Model (GLM) is a framework that extends linear regression to model response variables with different types of distributions by using a link function to relate the mean of the response variable to the linear predictor. GLMs are versatile and can be used for various types of data, making them a powerful tool in statistical modeling and analysis.
+    
+4. When fitting a multiple linear regression model, what does adding an interacion term do? That is , what does it allow the model to do differently as compared to when it is not included in the model?
+
+    When fitting a multiple linear regression model, adding an interaction term allows the model to account for the combined effect of two (or more) predictor variables on the response variable. This can be particularly useful when the effect of one predictor variable on the response variable depends on the value of another predictor variable.
+    
+5. Why do we split our data into a training and test set?
+
+    Splitting data into a training set and a test set is essential for assessing the model's ability to generalize to new data, Preventing overfitting, providing an unbiased evaluation of model performance, avoiding data leakage, ensuring that the model's performance is evaluated accurately and fairly.
+    
+### Task 2: Fitting Models
+
+Here we use the dataset called heart.csv. The data set gives information about whether or not someone has heart disease (HeartDisease =1 or =0) along with different measurements about that person's health.
+
+#### Quick EDA / Data Preparation
+
+Loading required packages
+```{r setup, message=FALSE, warning=FALSE}
+library(readr)
+library(caret)
+library(tidyverse)
+library(corrplot)
+library(randomForest)
+```
+
+Read in the data first.
+```{r}
+heart_data <- read_csv("https://www4.stat.ncsu.edu/online/datasets/heart.csv")
+```
+
+After checking the data, I want to convert the character variables to factors. And also there is a numeric variable FastingBS (0/1) also need to be converted to factor. And then check on the missingness and summarize the data with respect to the relationships of the variables to HeartDisease.
+```{r}
+# convert character variables to factors
+heart_data <- heart_data |>
+  mutate(across(where(is.character), as.factor))
+
+heart_data$FastingBS <- as.factor(heart_data$FastingBS)
+
+# check missing values
+sum(is.na(heart_data))
+```
+Data set doesn't contain any missing values. Then we do some summaries for both numerical and categorical variables.
+
+```{r}
+# summary the whole data frame
+summary(heart_data)
+
+```
+Calculate and plot correlation between all numerical features.
+```{r}
+m= cor(select(heart_data,c(HeartDisease,Age,RestingBP,Cholesterol, MaxHR,Oldpeak)))
+corrplot(m, method='color',
+         order='alphabet',
+         diag=FALSE,
+         col=COL2('PiYG')
+      )
+```
+
+It seems person with heart disease has some linear correlation with age, resting blood pressure, serum cholesterol, maximum heart rate and oldpeak.
+
+Now, check on categorical variables vs. HeartDisease
+
+```{r}
+# Function to summarize a categorical variable by HeartDisease
+
+category_summary <- function(var){
+  heart_data |>
+  count(HeartDisease, {{var}}) |>
+  group_by(HeartDisease) |>
+  mutate(percentage = n / sum(n) * 100)
+}
+
+# gender vs. heartdisease
+gender_summary <- category_summary(Sex)
+print(gender_summary)
+
+# chestpain type vs. HeartDisease
+chestpain_summary <-category_summary(ChestPainType)
+print(chestpain_summary)
+
+# fastingBS vs HeartDisease
+fastingBS_summary <- category_summary(FastingBS)
+print(fastingBS_summary)
+
+# restingECG vs. HeartDisease
+resting_summary <- category_summary(RestingECG)
+print(resting_summary)
+
+# exerciseangina vs heartdisease
+exerciseAngina_summary <-category_summary(ExerciseAngina)
+print(exerciseAngina_summary)
+```
+From the above summary, Four categorical variables may be related to Heart Disease. Male may has high percentage with heart disease compared to female. Chest pain type with ASY, RestingECG with ST may has higher rate of heart disease. Heart disease is probably also related to exercise induced angina.
+
+Now we want to create a new variable which is a factor version of HeartDisease varible and remove the ST_slope and the original HeartDisease variable
+
+```{r}
+heart_data <- heart_data |>
+  mutate(HD=ifelse(HeartDisease==0,"No","Yes")) |>
+  mutate(HD=as.factor(HD))|>
+  select(-HeartDisease,-ST_Slope) 
+
+```
+
+We will create dummy columns corresponding to the Sex, ExerciseAngina, ChestPainType and RestingECG for use in KNN model. 
+
+```{r}
+# Create dummy variables for categorical columns
+dummies <- dummyVars(~ Sex + ChestPainType + RestingECG + ExerciseAngina, data = heart_data)
+
+# Generate the dummy columns
+dummy_data <- predict(dummies, newdata = heart_data)
+
+# Convert the dummy data to a data frame
+dummy_data <- as.data.frame(dummy_data)
+
+# Combine the dummy columns with the original data
+heart_data <- cbind(heart_data, dummy_data)
+```
+
+Now, let's check the data structure
+```{r}
+str(heart_data)
+```
+
+### Split the data
+
+Split the heart_data into training and test set with a 70:30 ratio.
+```{r}
+set.seed(5)
+trainIndex <-createDataPartition(heart_data$HD, p=0.7, list=FALSE)
+train_data <-heart_data[trainIndex,]
+test_data <-heart_data[-trainIndex,]
+```
+
+### Preprocessing data
+preprocessing data
+```{r}
+pre_proc_values <- preProcess(train_data, method=c("center","scale"))
+
+# scaling and centralizing train and test data sets
+train_trans <- predict(pre_proc_values, train_data)
+test_trans <- predict(pre_proc_values, test_data)
+```
+
+Training the kNN model, 10 fold cv, repeats =3.
+We need to standardize our data using caret’s preProcess() method.
+```{r}
+train.control <- trainControl(method="repeatedcv", number=10, repeats=3)
+set.seed(123)
+
+# Remove unwanted columns
+train_data_knn <- train_data |>
+  select(-Sex, -ChestPainType, -FastingBS, -RestingECG, -ExerciseAngina)
+
+# Create the tuning grid for k values from 1 to 40
+tune_grid <- expand.grid(k = 1:40)
+
+knn_model <- train(HD~ ., 
+                   data=train_data_knn, 
+                   method="knn", 
+                   trControl=train.control,
+                   preProcess=c('center','scale'),
+                   tuneGrid=tune_grid)
+
+knn_model
+```
+From the results, it automatically selects best k-value. Here, our training model is choosing k = 35 as its final value.
+
+Let's plot the result
+```{r}
+plot(knn_model)
+```
+As it could be seen from the graph above, k=35 has the highest accuracy.
+
+Now, our model is trained with K value as 35. We are ready to predict classes for our test set. We can use predict() method.
+```{r}
+test_pred <- predict(knn_model, newdata = test_trans)
+test_pred
+```
+Check how Accurately our knn model is working?
+Using confusionMatrix(), we can print statistics of our results. It shows that our model accuracy for test set is 76.36%.
+```{r}
+confusionMatrix(test_pred, test_trans$HD)
+```
+
+### Logistic Regression
+
+preprocessing data
+```{r}
+#remove the dummy variables from train and test dataset
+train_log <- train_data |>
+  select(1:11)
+test_log <- test_data |>
+  select(1:11)
+
+pre_proc_values <- preProcess(train_log, method=c("center","scale"))
+
+# scaling and centralizing train and test data sets
+train_trans <- predict(pre_proc_values, train_log)
+test_trans <- predict(pre_proc_values, test_log)
+```
+```{r}
+# Define train control for repeated CV
+train.control <- trainControl(method = "repeatedcv", number = 10, repeats = 3)
+
+# Set seed for reproducibility
+set.seed(123)
+```
+
+Logistic Regression Model 
+
+Fitting logistic regression model 1 with all variables from train_trans data set except HD. (dummy variables already removed here)
+
+```{r}
+# Fit Model 1
+glm_model_1 <- train(HD ~ ., 
+                     data = train_trans,
+                     method = "glm", 
+                     family = "binomial",
+                     trControl = train.control,
+                     metric="Accuracy")
+
+# Print summary of Model 1
+summary(glm_model_1)
+glm_model_1
+```
+
+Predict on test data and Check how well this model 1 does on the test set using confusionMatrix(). We find the accuracy is 83.27%
+```{r}
+test_pred_glm_1 <- predict(glm_model_1, newdata=select(test_trans, -c(HD)), type='raw')
+test_pred_glm_1
+
+# check how well this model does
+confusionMatrix(test_pred_glm_1, test_trans$HD)
+```
+
+
+Logistic Regression Model 2: fiting a model with predictors: Age, Oldpeak, MaxHR, ChestPainType,ExerciseAngina,Cholesterol
+
+```{r}
+# Fit model 2
+glm_model_2 <- train(HD ~ Age+MaxHR+Oldpeak+ExerciseAngina+Cholesterol, 
+                     data = train_trans, 
+                     method = "glm", 
+                     family = "binomial",
+                     trControl = train.control,
+                     preProcess = c('center', 'scale'))
+
+# Print summary of Model 2
+summary(glm_model_2)
+glm_model_2
+```
+Predict on test data and Check how well this model does on the test set using confusionMatrix(). We find the accuracy is 80%
+```{r}
+test_pred_glm_2 <- predict(glm_model_2, newdata=select(test_trans, -c(HD)), type='raw')
+test_pred_glm_2
+
+# check how well this model does
+confusionMatrix(test_pred_glm_2, test_trans$HD)
+```
+
+Logistic Regression Model 3: fiting a model only with predictors Age and MaxHR interaction term,Oldpeak,ChestPainType,ExerciseAngina
+
+```{r}
+# Fit model 3
+glm_model_3 <- train(HD ~ Age*MaxHR + Oldpeak+ Cholesterol+ExerciseAngina, 
+                     data = train_trans, 
+                     method = "glm", 
+                     family = "binomial",
+                     trControl = train.control,
+                     preProcess = c('center', 'scale'))
+
+# Print summary of Model 3
+summary(glm_model_3)
+glm_model_3
+```
+Predict on test data and Check how well this model does on the test set using confusionMatrix(). We find the accuracy is 79.64%
+```{r}
+test_pred_glm_3 <- predict(glm_model_3, newdata=select(test_trans, -c(HD)), type='raw')
+test_pred_glm_3
+
+# check how well this model does
+confusionMatrix(test_pred_glm_3, test_trans$HD)
+```
+
+From the above three logistic regression model, the best model of them is the model with full predictors
+
+Predict on test data and Check how well this model 1 does on the test set using confusionMatrix(). We find the accuracy is 83.27%
+```{r}
+test_pred_glm_1 <- predict(glm_model_1, newdata=select(test_trans, -c(HD)), type='raw')
+test_pred_glm_1
+
+# check how well this model does
+confusionMatrix(test_pred_glm_1, test_trans$HD)
+```
+
+### Tree Models
+
+Classification tree model
+```{r}
+# Define train control for repeated CV
+train.control <- trainControl(method = "repeatedcv", number = 10, repeats = 3)
+
+# Define the tuning grid for cp
+tune_grid <- expand.grid(cp = seq(0, 0.1, by = 0.001))
+
+# Set seed for reproducibility
+set.seed(123)
+
+# Fit the classification tree model using rpart
+classification_tree_model <- train(HD ~ Age+MaxHR+Oldpeak+ExerciseAngina+Cholesterol, 
+                    data = train_trans, 
+                    method = "rpart", 
+                    trControl = train.control,
+                    tuneGrid = tune_grid,
+                    preProcess = c('center', 'scale'))
+
+# Print the summary of the fitted model
+print(classification_tree_model)
+```
+
+```{r}
+# Make predictions on the test set
+test_pred_class_tree <- predict(classification_tree_model, test_trans)
+
+# Evaluate the model performance on the test set using confusionMatrix
+conf_matrix_class_tree <- confusionMatrix(test_pred_class_tree, test_trans$HD)
+conf_matrix_class_tree
+```
+
+Random Forest 
+```{r}
+# Determine the number of predictors
+num_predictors <- ncol(train_trans) - 1  # subtract 1 for the response variable
+
+# Define the tuning grid for mtry
+tune_grid <- expand.grid(mtry = 1:num_predictors)
+
+# Fit the random forest model using rf
+rf_model <- train(HD ~ ., 
+                  data = train_trans, 
+                  method = "rf", 
+                  trControl = train.control,
+                  tuneGrid = tune_grid,
+                  preProcess = c('center', 'scale'))
+
+# Print the summary of the fitted model
+print(rf_model)
+```
+
+```{r}
+# Make predictions on the test set
+test_pred_rf <- predict(rf_model, test_trans)
+
+# Evaluate the model performance on the test set using confusionMatrix
+conf_matrix_rf <- confusionMatrix(test_pred_rf, test_trans$HD)
+print(conf_matrix_rf)
+```
+
+Boosted Tree
+
+```{r}
+# Define the tuning grid
+tune_grid <- expand.grid(
+  n.trees = c(25, 50, 100, 200),
+  interaction.depth = c(1, 2, 3),
+  shrinkage = 0.1,
+  n.minobsinnode = 10
+)
+
+# Define train control for repeated CV
+train.control <- trainControl(method = "repeatedcv", number = 10, repeats = 3)
+
+# Set seed for reproducibility
+set.seed(123)
+
+# Fit the boosted tree model using gbm
+gbm_model <- train(HD ~ ., 
+                   data = train_trans, 
+                   method = "gbm", 
+                   trControl = train.control,
+                   tuneGrid = tune_grid,
+                   verbose = FALSE)
+
+# Print the summary of the fitted model
+print(gbm_model)
+```
+The optimal model parameters were found to be n.trees = 100, interaction.depth = 2, shrinkage = 0.1, and n.minobsinnode = 10. This model is expected to provide the best performance based on the accuracy metric.
+
+Evaluate the Boosted Tree Model Using Confusion Matrix
+```{r}
+# Make predictions on the test set
+test_pred_gbm <- predict(gbm_model, test_trans)
+
+# Evaluate the model performance on the test set using confusionMatrix
+conf_matrix_gbm <- confusionMatrix(test_pred_gbm, test_trans$HD)
+print(conf_matrix_gbm)
+```
+Among the Tree Models, accuracy of classfication tree model, random forest, boosted tree model is 0.7855, 0.84, 0.8218 respectively. Thus, the random forest model did the best job among these three models.
+
+
+### Model Comparison
+
+Accuracy of kNN model on the test set is 0.8286.
+Accuracy of Logistic Regression Model 1 on the test set is 0.8327.
+Accuracy of the best Tree Model is random forest model which has an accuracy of 0.84.
+In conclusion, random forest model did the best job in terms of accuracy on the test set.
