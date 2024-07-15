@@ -683,15 +683,21 @@ Prediction  No Yes
 <p>Logistic Regression Model 2: fiting a model with predictors: Age, Oldpeak, MaxHR, ChestPainType,ExerciseAngina,Cholesterol</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb42"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb42-1"><a href="#cb42-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Fit model 2</span></span>
-<span id="cb42-2"><a href="#cb42-2" aria-hidden="true" tabindex="-1"></a>glm_model_2 <span class="ot">&lt;-</span> <span class="fu">train</span>(HD <span class="sc">~</span> Age<span class="sc">+</span>MaxHR<span class="sc">+</span>Oldpeak<span class="sc">+</span>ExerciseAngina<span class="sc">+</span>Cholesterol, </span>
-<span id="cb42-3"><a href="#cb42-3" aria-hidden="true" tabindex="-1"></a>                     <span class="at">data =</span> train_trans, </span>
-<span id="cb42-4"><a href="#cb42-4" aria-hidden="true" tabindex="-1"></a>                     <span class="at">method =</span> <span class="st">"glm"</span>, </span>
-<span id="cb42-5"><a href="#cb42-5" aria-hidden="true" tabindex="-1"></a>                     <span class="at">family =</span> <span class="st">"binomial"</span>,</span>
-<span id="cb42-6"><a href="#cb42-6" aria-hidden="true" tabindex="-1"></a>                     <span class="at">trControl =</span> train.control,</span>
-<span id="cb42-7"><a href="#cb42-7" aria-hidden="true" tabindex="-1"></a>                     <span class="at">preProcess =</span> <span class="fu">c</span>(<span class="st">'center'</span>, <span class="st">'scale'</span>))</span>
-<span id="cb42-8"><a href="#cb42-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb42-9"><a href="#cb42-9" aria-hidden="true" tabindex="-1"></a><span class="co"># Print summary of Model 2</span></span>
-<span id="cb42-10"><a href="#cb42-10" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(glm_model_2)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb42-2"><a href="#cb42-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb42-3"><a href="#cb42-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Define train control for repeated CV</span></span>
+<span id="cb42-4"><a href="#cb42-4" aria-hidden="true" tabindex="-1"></a>train.control <span class="ot">&lt;-</span> <span class="fu">trainControl</span>(<span class="at">method =</span> <span class="st">"repeatedcv"</span>, <span class="at">number =</span> <span class="dv">5</span>, <span class="at">repeats =</span> <span class="dv">3</span>)</span>
+<span id="cb42-5"><a href="#cb42-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb42-6"><a href="#cb42-6" aria-hidden="true" tabindex="-1"></a><span class="co"># Set seed for reproducibility</span></span>
+<span id="cb42-7"><a href="#cb42-7" aria-hidden="true" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">123</span>)</span>
+<span id="cb42-8"><a href="#cb42-8" aria-hidden="true" tabindex="-1"></a>glm_model_2 <span class="ot">&lt;-</span> <span class="fu">train</span>(HD <span class="sc">~</span> Age<span class="sc">+</span>MaxHR<span class="sc">+</span>Oldpeak<span class="sc">+</span>ExerciseAngina<span class="sc">+</span>Cholesterol, </span>
+<span id="cb42-9"><a href="#cb42-9" aria-hidden="true" tabindex="-1"></a>                     <span class="at">data =</span> train_trans, </span>
+<span id="cb42-10"><a href="#cb42-10" aria-hidden="true" tabindex="-1"></a>                     <span class="at">method =</span> <span class="st">"glm"</span>, </span>
+<span id="cb42-11"><a href="#cb42-11" aria-hidden="true" tabindex="-1"></a>                     <span class="at">family =</span> <span class="st">"binomial"</span>,</span>
+<span id="cb42-12"><a href="#cb42-12" aria-hidden="true" tabindex="-1"></a>                     <span class="at">trControl =</span> train.control,</span>
+<span id="cb42-13"><a href="#cb42-13" aria-hidden="true" tabindex="-1"></a>                     <span class="at">preProcess =</span> <span class="fu">c</span>(<span class="st">'center'</span>, <span class="st">'scale'</span>))</span>
+<span id="cb42-14"><a href="#cb42-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb42-15"><a href="#cb42-15" aria-hidden="true" tabindex="-1"></a><span class="co"># Print summary of Model 2</span></span>
+<span id="cb42-16"><a href="#cb42-16" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(glm_model_2)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>
 Call:
@@ -725,12 +731,12 @@ Number of Fisher Scoring iterations: 5</code></pre>
   2 classes: 'No', 'Yes' 
 
 Pre-processing: centered (5), scaled (5) 
-Resampling: Cross-Validated (10 fold, repeated 3 times) 
-Summary of sample sizes: 578, 578, 578, 578, 580, 580, ... 
+Resampling: Cross-Validated (5 fold, repeated 3 times) 
+Summary of sample sizes: 515, 514, 514, 515, 514, 514, ... 
 Resampling results:
 
-  Accuracy  Kappa    
-  0.809847  0.6168373</code></pre>
+  Accuracy   Kappa    
+  0.8060309  0.6087954</code></pre>
 </div>
 </div>
 <p>Predict on test data and Check how well this model does on the test set using confusionMatrix(). We find the accuracy is 80%</p>
@@ -791,15 +797,20 @@ Prediction  No Yes
 <p>Logistic Regression Model 3: fiting a model only with predictors Age and MaxHR interaction term,Oldpeak,ChestPainType,ExerciseAngina</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb50"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb50-1"><a href="#cb50-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Fit model 3</span></span>
-<span id="cb50-2"><a href="#cb50-2" aria-hidden="true" tabindex="-1"></a>glm_model_3 <span class="ot">&lt;-</span> <span class="fu">train</span>(HD <span class="sc">~</span> Age<span class="sc">*</span>MaxHR <span class="sc">+</span> Oldpeak<span class="sc">+</span> Cholesterol<span class="sc">+</span>ExerciseAngina, </span>
-<span id="cb50-3"><a href="#cb50-3" aria-hidden="true" tabindex="-1"></a>                     <span class="at">data =</span> train_trans, </span>
-<span id="cb50-4"><a href="#cb50-4" aria-hidden="true" tabindex="-1"></a>                     <span class="at">method =</span> <span class="st">"glm"</span>, </span>
-<span id="cb50-5"><a href="#cb50-5" aria-hidden="true" tabindex="-1"></a>                     <span class="at">family =</span> <span class="st">"binomial"</span>,</span>
-<span id="cb50-6"><a href="#cb50-6" aria-hidden="true" tabindex="-1"></a>                     <span class="at">trControl =</span> train.control,</span>
-<span id="cb50-7"><a href="#cb50-7" aria-hidden="true" tabindex="-1"></a>                     <span class="at">preProcess =</span> <span class="fu">c</span>(<span class="st">'center'</span>, <span class="st">'scale'</span>))</span>
-<span id="cb50-8"><a href="#cb50-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb50-9"><a href="#cb50-9" aria-hidden="true" tabindex="-1"></a><span class="co"># Print summary of Model 3</span></span>
-<span id="cb50-10"><a href="#cb50-10" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(glm_model_3)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb50-2"><a href="#cb50-2" aria-hidden="true" tabindex="-1"></a><span class="co"># Define train control for repeated CV</span></span>
+<span id="cb50-3"><a href="#cb50-3" aria-hidden="true" tabindex="-1"></a>train.control <span class="ot">&lt;-</span> <span class="fu">trainControl</span>(<span class="at">method =</span> <span class="st">"repeatedcv"</span>, <span class="at">number =</span> <span class="dv">5</span>, <span class="at">repeats =</span> <span class="dv">3</span>)</span>
+<span id="cb50-4"><a href="#cb50-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb50-5"><a href="#cb50-5" aria-hidden="true" tabindex="-1"></a><span class="co"># Set seed for reproducibility</span></span>
+<span id="cb50-6"><a href="#cb50-6" aria-hidden="true" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">123</span>)</span>
+<span id="cb50-7"><a href="#cb50-7" aria-hidden="true" tabindex="-1"></a>glm_model_3 <span class="ot">&lt;-</span> <span class="fu">train</span>(HD <span class="sc">~</span> Age<span class="sc">*</span>MaxHR <span class="sc">+</span> Oldpeak<span class="sc">+</span> Cholesterol<span class="sc">+</span>ExerciseAngina, </span>
+<span id="cb50-8"><a href="#cb50-8" aria-hidden="true" tabindex="-1"></a>                     <span class="at">data =</span> train_trans, </span>
+<span id="cb50-9"><a href="#cb50-9" aria-hidden="true" tabindex="-1"></a>                     <span class="at">method =</span> <span class="st">"glm"</span>, </span>
+<span id="cb50-10"><a href="#cb50-10" aria-hidden="true" tabindex="-1"></a>                     <span class="at">family =</span> <span class="st">"binomial"</span>,</span>
+<span id="cb50-11"><a href="#cb50-11" aria-hidden="true" tabindex="-1"></a>                     <span class="at">trControl =</span> train.control,</span>
+<span id="cb50-12"><a href="#cb50-12" aria-hidden="true" tabindex="-1"></a>                     <span class="at">preProcess =</span> <span class="fu">c</span>(<span class="st">'center'</span>, <span class="st">'scale'</span>))</span>
+<span id="cb50-13"><a href="#cb50-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb50-14"><a href="#cb50-14" aria-hidden="true" tabindex="-1"></a><span class="co"># Print summary of Model 3</span></span>
+<span id="cb50-15"><a href="#cb50-15" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(glm_model_3)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>
 Call:
@@ -834,12 +845,12 @@ Number of Fisher Scoring iterations: 5</code></pre>
   2 classes: 'No', 'Yes' 
 
 Pre-processing: centered (6), scaled (6) 
-Resampling: Cross-Validated (10 fold, repeated 3 times) 
-Summary of sample sizes: 578, 578, 579, 579, 579, 579, ... 
+Resampling: Cross-Validated (5 fold, repeated 3 times) 
+Summary of sample sizes: 515, 514, 514, 515, 514, 514, ... 
 Resampling results:
 
-  Accuracy   Kappa   
-  0.8075515  0.612715</code></pre>
+  Accuracy   Kappa    
+  0.8049972  0.6066332</code></pre>
 </div>
 </div>
 <p>Predict on test data and Check how well this model does on the test set using confusionMatrix(). We find the accuracy is 79.64%</p>
